@@ -1,1 +1,13 @@
+neurochrono-bci/
+├── index.html                        # Interactive GitHub Pages dashboard
+├── README.md                         # Project documentation
+├── requirements.txt                  # Python dependencies
+├── src/                              # <-- All Python code goes in this folder
+│   ├── config.py                     # Shared paths, channels, and event markers
+│   ├── 01_dataset_audit.py           # Week 1: Raw PSD & stimulus trigger audit
+│   ├── 02_preprocessing_ica.py       # Week 2: Filtering, FastICA, resampling & epochs
+│   ├── 03_riemannian_decoding.py     # Week 3: 5-fold CV, ROC-AUC & model export
+│   └── 04_lsl_realtime_benchmark.py  # Week 4: Real-time LSL geodesic streaming
+├── models/                           # Output folder for .npy tensors & centroids
+└── results/                          # Output folder for .png plots & audit .csv
 
