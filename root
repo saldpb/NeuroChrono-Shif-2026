@@ -265,4 +265,130 @@
       const shapeMatch = headerStr.match(/'shape':\s*\(([^)]+)\)/);
       const parsedShape = shapeMatch
         .split(",")
+  <script>
+    let epochData = null;
+    let labelData = null;
+    let shape = new Array(0);
+
+    async function parseNpy(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch " + url);
+      const buf = await res.arrayBuffer();
+      const view = new DataView(buf);
+      const headerLen = view.getUint16(8, true);
+      const headerStr = new TextDecoder().decode(new Uint8Array(buf, 10, headerLen));
+      const shapeMatch = headerStr.match(/'shape':\s*\(([^)]+)\)/);
+      const parsedShape = shapeMatch.at(1)
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(Number);
+      const dataOffset = 10 + headerLen;
+
+      let array;
+      if (headerStr.includes("<f4")) array = new Float32Array(buf, dataOffset);
+      else if (headerStr.includes("<f8")) array = new Float64Array(buf, dataOffset);
+      else if (headerStr.includes("<i8")) array = new BigInt64Array(buf, dataOffset);
+      else if (headerStr.includes("<i4")) array = new Int32Array(buf, dataOffset);
+      else array = new Float64Array(buf, dataOffset);
+
+      return { shape: parsedShape, data: array };
+    }
+
+    async function initDashboard() {
+      try {
+        const epochs = await parseNpy("models/X_clean_epochs.npy");
+        epochData = epochs.data;
+        shape = epochs.shape;
+        document.getElementById("tensor-shape").textContent = `(${shape.join(", ")})`;
+        document.getElementById("trial-idx").max = shape.at(0) - 1;
+      } catch (e) {
+        document.getElementById("tensor-shape").textContent = "(145, 6, 201)";
+        document.getElementById("trial-status").textContent = "Place X_clean_epochs.npy in models/ for live preview.";
+      }
+
+      try {
+        const labels = await parseNpy("models/y_labels.npy");
+        labelData = Array.from(labels.data, Number);
+        const nThreat = labelData.filter(v => v === 3).length;
+        const nNeutral = labelData.filter(v => v === 4).length;
+        document.getElementById("class-split").textContent = `${nThreat} Threat / ${nNeutral} Neutral`;
+      } catch (e) {
+        document.getElementById("class-split").textContent = "y_labels.npy optional";
+      }
+
+      drawTrial();
+    }
+
+    function drawTrial() {
+      if (!epochData) return;
+      const maxTrials = shape.at(0) - 1;
+      const tIdx = Math.min(Math.max(0, parseInt(document.getElementById("trial-idx").value) || 0), maxTrials);
+      const cIdx = parseInt(document.getElementById("ch-idx").value);
+      const nCh = shape.at(1);
+      const nTimes = shape.at(2);
+      const offset = (tIdx * nCh + cIdx) * nTimes;
+      const trace = epochData.subarray(offset, offset + nTimes);
+
+      const badge = document.getElementById("trial-class-badge");
+      let strokeColor = "#38bdf8";
+      if (labelData && labelData.at(tIdx) !== undefined) {
+        const lbl = labelData.at(tIdx);
+        if (lbl === 3) {
+          badge.textContent = "Threat / Sub-Perceptual (ID 3)";
+          badge.className = "class-pill pill-threat";
+          strokeColor = "#ef4444";
+        } else if (lbl === 4) {
+          badge.textContent = "Neutral / Control (ID 4)";
+          badge.className = "class-pill pill-neutral";
+          strokeColor = "#3b82f6";
+        } else {
+          badge.textContent = `Marker ID ${lbl}`;
+          badge.className = "class-pill pill-unknown";
+        }
+      }
+
+      const canvas = document.getElementById("epoch-canvas");
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      let minV = Infinity, maxV = -Infinity;
+      for (let i = 0; i < nTimes; i++) {
+        const val = trace.at(i);
+        if (val < minV) minV = val;
+        if (val > maxV) maxV = val;
+      }
+      const pad = (maxV - minV) * 0.15 || 1e-6;
+      minV -= pad;
+      maxV += pad;
+
+      // Zero amplitude & stimulus onset (t = 0 ms at 1/8th of -100..700ms window)
+      ctx.strokeStyle = "#334155";
+      ctx.setLineDash(Array.of(6, 4));
+      const zeroY = H - ((0 - minV) / (maxV - minV)) * H;
+      ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(W, zeroY); ctx.stroke();
+      const stimX = W * (0.1 / 0.8);
+      ctx.beginPath(); ctx.moveTo(stimX, 0); ctx.lineTo(stimX, H); ctx.stroke();
+      ctx.setLineDash(new Array(0));
+
+      // Plot EEG waveform
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      for (let i = 0; i < nTimes; i++) {
+        const x = (i / (nTimes - 1)) * W;
+        const y = H - ((trace.at(i) - minV) / (maxV - minV)) * H;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      document.getElementById("trial-status").textContent =
+        `Trial #${tIdx} | Peak-to-Peak: ${((maxV - minV - 2 * pad) * 1e6).toFixed(2)} µV`;
+    }
+
+    document.getElementById("trial-idx").addEventListener("input", drawTrial);
+    document.getElementById("ch-idx").addEventListener("change", drawTrial);
+    initDashboard();
+  </script>
 
