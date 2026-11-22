@@ -1,1 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroChrono | Sub-Perceptual Threat Gating BCI Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --threat: #ef4444;
+      --neutral: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 1180px; margin: 0 auto; }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    h1 { font-size: 1.9rem; color: var(--accent); margin-bottom: 0.4rem; }
+    .subtitle { color: var(--muted); font-size: 1rem; }
+    .badge-row { margin-top: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .badge {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin: 2rem 0 1rem;
+      border-left: 4px solid var(--accent);
+      padding-left: 0.75rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+      gap: 1.5rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card h3 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .card p { font-size: 0.88rem; color: var(--muted); margin-bottom: 0.9rem; }
+    .card img {
+      width: 100%;
+      border-radius: 6px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      cursor: zoom-in;
+    }
+    .card-footer {
+      margin-top: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+    }
+    a.btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      margin-right: 0.35rem;
+    }
+    a.btn:hover { opacity: 0.9; }
+    .tensor-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .tensor-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .stat {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem;
+    }
+    .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+    .stat-val { font-size: 1.15rem; font-weight: 700; color: var(--accent); margin-top: 0.2rem; }
+    canvas {
+      width: 100%;
+      height: 240px;
+      background: #0b1120;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-top: 1rem;
+    }
+    .controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 1rem; }
+    select, input[type="number"] {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.6rem;
+      border-radius: 6px;
+    }
+    .class-pill {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .pill-threat { background: rgba(239, 68, 68, 0.18); color: #fca5a5; border: 1px solid var(--threat); }
+    .pill-neutral { background: rgba(59, 130, 246, 0.18); color: #93c5fd; border: 1px solid var(--neutral); }
+    .pill-unknown { background: rgba(148, 163, 184, 0.15); color: var(--muted); border: 1px solid var(--border); }
+    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>NeuroChrono: Sub-Perceptual Threat Gating BCI</h1>
+      <p class="subtitle">6-Channel Posterior EEG Pipeline (P3, Pz, P4, O1, Oz, O2) • Riemannian Geometry • Real-Time LSL Streaming</p>
+      <div class="badge-row">
+        <span class="badge">MNE-Python + FastICA</span>
+        <span class="badge">PyRiemann ERPCovariances + MDM</span>
+        <span class="badge">Target ROC-AUC &gt; 0.88</span>
+        <span class="badge">Closed-Loop Latency &lt; 250 ms</span>
+      </div>
+    </header>
+
+    <!-- SECTION 1: CLEAN EPOCH TENSOR INSPECTOR -->
+    <h2>1. Clean Epoch Tensor (<code>X_clean_epochs.npy</code> &amp; <code>y_labels.npy</code>)</h2>
+    <div class="tensor-box">
+      <p style="color: var(--muted); font-size: 0.92rem;">
+        Preprocessed, notch/bandpass-filtered (0.1–30 Hz), and ICA-cleaned single-trial EEG epochs with stimulus class labels exported from Week 2.
+      </p>
+      <div class="tensor-stats">
+        <div class="stat">
+          <div class="stat-label">Epoch Tensor Shape</div>
+          <div class="stat-val" id="tensor-shape">Loading .npy...</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Channels (6)</div>
+          <div class="stat-val" style="font-size: 1rem;">P3, Pz, P4, O1, Oz, O2</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Class Split (ID 3 / ID 4)</div>
+          <div class="stat-val" id="class-split" style="font-size: 1rem;">Loading labels...</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Dataset Exports</div>
+          <div style="margin-top: 0.35rem;">
+            <a class="btn" href="models/X_clean_epochs.npy" download>X_epochs.npy</a>
+            <a class="btn" href="models/y_labels.npy" download>y_labels.npy</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label>Trial Index: <input type="number" id="trial-idx" value="0" min="0" max="144" /></label>
+        <label>Channel:
+          <select id="ch-idx">
+            <option value="0">0: P3</option>
+            <option value="1" selected>1: Pz</option>
+            <option value="2">2: P4</option>
+            <option value="3">3: O1</option>
+            <option value="4">4: Oz</option>
+            <option value="5">5: O2</option>
+          </select>
+        </label>
+        <span id="trial-class-badge" class="class-pill pill-unknown">Class: --</span>
+        <span id="trial-status" style="font-size: 0.85rem; color: var(--muted);"></span>
+      </div>
+      <canvas id="epoch-canvas" width="1000" height="240"></canvas>
+    </div>
+
+    <!-- SECTION 2: PIPELINE PNG ARTIFACTS -->
+    <h2>2. Pipeline Milestone Visualizations (PNG)</h2>
+    <div class="grid">
+      <div class="card">
+        <div>
+          <h3>Week 1: Raw 6-Channel PSD &amp; Event Audit</h3>
+          <p>Unfiltered power spectral density (0.5–100 Hz) highlighting 60 Hz line noise and STI 014 trial counts.</p>
+          <img src="results/week1_psd_and_events.png" alt="Week 1 PSD and Events" />
+        </div>
+        <div class="card-footer">
+          <span style="color: var(--muted);">results/week1_psd_and_events.png</span>
+          <a class="btn" href="results/week1_psd_and_events.png" target="_blank">Full Size</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div>
+          <h3>Week 2: ICA-Cleaned Grand-Average ERPs (Pz &amp; Oz)</h3>
+          <p>Evoked Threat (ID 3) vs. Neutral (ID 4) waveforms highlighting the 180–350 ms eLPP / P300 gating window.</p>
+          <img src="results/week2_erp_waveforms.png" alt="Week 2 ERP Waveforms" />
+        </div>
+        <div class="card-footer">
+          <span style="color: var(--muted);">results/week2_erp_waveforms.png</span>
+          <a class="btn" href="results/week2_erp_waveforms.png" target="_blank">Full Size</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div>
+          <h3>Week 3: Leak-Free 5-Fold CV ROC-AUC Curves</h3>
+          <p>Riemannian MDM vs. Tangent Space Logistic Regression classification performance against the 0.88 target.</p>
+          <img src="results/milestone3_roc_auc_curves.png" alt="Milestone 3 ROC-AUC Curves" />
+        </div>
+        <div class="card-footer">
+          <span style="color: var(--muted);">results/milestone3_roc_auc_curves.png</span>
+          <a class="btn" href="results/milestone3_roc_auc_curves.png" target="_blank">Full Size</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div>
+          <h3>Week 4: Real-Time LSL Geodesic Latency</h3>
+          <p>End-to-end closed-loop packet latency distribution (220 ms acquisition + edge Riemannian distance compute).</p>
+          <img src="results/milestone3_latency_distribution.png" alt="Milestone 3 Latency Distribution" />
+        </div>
+        <div class="card-footer">
+          <span style="color: var(--muted);">results/milestone3_latency_distribution.png</span>
+          <a class="btn" href="results/milestone3_latency_distribution.png" target="_blank">Full Size</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal NumPy .npy Reader + Class-Aware Waveform Renderer -->
+  <script>
+    let epochData = null;
+    let labelData = null;
+    let shape =;
+
+    async function parseNpy(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch " + url);
+      const buf = await res.arrayBuffer();
+      const view = new DataView(buf);
+      const headerLen = view.getUint16(8, true);
+      const headerStr = new TextDecoder().decode(new Uint8Array(buf, 10, headerLen));
+      const shapeMatch = headerStr.match(/'shape':\s*\(([^)]+)\)/);
+      const parsedShape = shapeMatch
+        .split(",")
 
